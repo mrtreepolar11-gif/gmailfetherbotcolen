@@ -3,13 +3,12 @@ import os
 import asyncio
 from datetime import datetime
 from aiohttp import web
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatJoinRequest
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
-    ChatJoinRequestHandler,
     filters,
 )
 
@@ -21,29 +20,31 @@ logger = logging.getLogger(__name__)
 TOKEN = "9197059198:AAF-uRkXSJjGiQF54qsBXKBBfK53H9l5s3Q"
 ADMIN_ID = 7458685213
 ADMIN_USERNAME = "@nahidbro204"
-CHANNEL_LINK = "https://t.me/nahidgmailsallar204"
+CHANNEL_LINK = "https://t.me/nahidgmailsallar204"  # অফিশিয়াল গ্রুপ/চ্যানেল লিংক
 BOT_LINK = "https://t.me/gmailfetherbot"
 
 GROUP_CHAT_ID = -100435225206  # আপনার গ্রুপ আইডি
 
 # In-memory Database & States
 user_balances = {}     # user_id -> balance
-approved_users = set() # approved user IDs after joining channel/group
+approved_users = set() # approved user IDs after clicking check join
 user_states = {}       # user_id -> state tracking
 user_temp_data = {}    # user_id -> temp data storage
 
 # Main Menu Keyboard
-def get_main_menu():
+def get_main_menu(user_id):
+    balance = user_balances.get(user_id, 0.0)
     keyboard = [
+        [InlineKeyboardButton(f"💰 ব্যালেন্স: {balance} BDT", callback_data="balance_info")],
         [InlineKeyboardButton("📥 জিমেইল কিনুন (Buy)", callback_data="buy_gmail")],
         [InlineKeyboardButton("📤 জিমেইল বিক্রি করুন (Sell)", callback_data="sell_gmail")],
         [InlineKeyboardButton("➕ ডিপোজিট করুন (Deposit)", callback_data="deposit_menu")],
-        [InlineKeyboardButton("💰 ব্যালেন্স ও উইথড্র", callback_data="balance_menu")],
+        [InlineKeyboardButton("💸 উইথড্র করুন (Withdraw)", callback_data="withdraw_request")],
         [InlineKeyboardButton("☎️ এডমিন সাপোর্ট & রিকভারি", url="https://t.me/nahidbro204")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# /start command (Checks channel approval)
+# /start command
 async def start(update: Update, context):
     user = update.effective_user
     if user.id not in user_balances:
@@ -55,37 +56,41 @@ async def start(update: Update, context):
             "আমাদের জিমেইল ট্রেডিং ও অটোমেটেড সার্ভিসে আপনাকে স্বাগতম।"
         )
         if update.message:
-            await update.message.reply_text(welcome_text, reply_markup=get_main_menu())
+            await update.message.reply_text(welcome_text, reply_markup=get_main_menu(user.id))
         elif update.callback_query:
-            await update.callback_query.message.edit_text(welcome_text, reply_markup=get_main_menu())
+            await update.callback_query.message.edit_text(welcome_text, reply_markup=get_main_menu(user.id))
     else:
         text = (
-            f"⚠️ বটটি ব্যবহার করতে হলে প্রথমে আমাদের অফিশিয়াল চ্যানেলে/গ্রুপে জয়েন করতে হবে!\n\n"
-            f"👉 লিংকে ক্লিক করে জয়েন রিকোয়েস্ট পাঠান: {CHANNEL_LINK}\n\n"
-            "জয়েন রিকোয়েস্ট পাঠানোর পর নিচের বাটনে ক্লিক করুন:"
+            f"🔔 **Notun Member Verification Request!**\n\n"
+            f"আমাদের অফিশিয়াল গ্রুপে জয়েন করুন। এখানে সকল বট চ্যানেলের আপডেট দেওয়া হবে[span_2](start_span)[span_2](end_span)!\n\n"
+            f"👉 গ্রুপ লিংক: {CHANNEL_LINK}"
         )
-        keyboard = [[InlineKeyboardButton("✅ আমি জয়েন করেছি, চেক করুন", callback_data="check_join")]]
+        keyboard = [
+            [InlineKeyboardButton("📢 গ্রুপে জয়েন করুন", url=CHANNEL_LINK)],
+            [InlineKeyboardButton("✅ আমি গ্রুপে জয়েন করেছি", callback_data="check_group_join")]
+        ]
         if update.message:
-            await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         elif update.callback_query:
-            await update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
-# Check join button callback
-async def check_join_callback(update: Update, context):
+# Check Group Join Button Callback
+async def check_group_join_callback(update: Update, context):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
-
-    if user_id in approved_users or user_id == ADMIN_ID:
-        await query.message.edit_text("স্বাগতম! আপনার মেনু:", reply_markup=get_main_menu())
-    else:
-        await query.answer("⚠️ এডমিন এখনো আপনার জয়েন রিকোয়েস্ট অ্যাপ্রুভ করেননি অথবা আপনি রিকোয়েস্ট পাঠাননি। দয়া করে রিকোয়েস্ট পাঠিয়ে অপেক্ষা করুন।", show_alert=True)
-
-# Auto handle channel/group join requests and notify admin with Approve/Reject buttons
-async def handle_chat_join_request(update: ChatJoinRequest, context):
-    user = update.from_user
+    user = query.from_user
     user_id = user.id
 
+    if user_id in approved_users or user_id == ADMIN_ID:
+        await query.message.edit_text("✅ আপনার ভেরিফিকেশন ইতিমধ্যে সম্পন্ন হয়েছে! মূল মেনু:", reply_markup=get_main_menu(user_id))
+        return
+
+    # Notify user to wait
+    await query.message.edit_text(
+        "⏳ আপনার রিকোয়েস্ট গ্রহণ করা হয়েছে। দয়া করে কিছুক্ষণ অপেক্ষা করুন, এডমিন চেক করে এপ্রুভ করলেই মেনুবার দেখতে পাবেন।"
+    )
+
+    # Send notification to Admin with Approve/Reject buttons
     keyboard = [
         [
             InlineKeyboardButton("✅ Approve", callback_data=f"approve_user_{user_id}"),
@@ -95,12 +100,18 @@ async def handle_chat_join_request(update: ChatJoinRequest, context):
     try:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
-            text=f"🔔 **নতুন চ্যানেল/গ্রুপ জয়েন রিকোয়েস্ট!**\n\n👤 নাম: {user.full_name}\n🆔 ইউজার আইডি: `{user_id}`\n🌐 ইউজারনেম: @{user.username if user.username else 'N/A'}",
+            text=(
+                f"🔔 **Notun Member Verification Request!**[span_3](start_span)[span_3](end_span)\n\n"
+                f"👤 User ID: `{user_id}`[span_4](start_span)[span_4](end_span)\n"
+                f"👤 Name: {user.full_name}\n"
+                f"🌐 Username: @{user.username if user.username else 'N/A'}[span_5](start_span)[span_5](end_span)\n"
+                f"📌 Status: ⏳ Pending"
+            ),
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
     except Exception as e:
-        logger.error(f"Failed to send join request to admin: {e}")
+        logger.error(f"Failed to send verification request to admin: {e}")
 
 # Callback Query Handler
 async def button_handler(update: Update, context):
@@ -109,15 +120,26 @@ async def button_handler(update: Update, context):
     data = query.data
     user_id = query.from_user.id
 
-    # Admin approval for channel join request
+    # Admin approval for user verification
     if data.startswith("approve_user_"):
         target_id = int(data.split("_")[2])
         approved_users.add(target_id)
-        await query.message.edit_text(f"✅ ইউজার (`{target_id}`) এর চ্যানেল জয়েন রিকোয়েস্ট সফলভাবে **অ্যাপ্রুভ** করা হয়েছে।", parse_mode="Markdown")
+        
+        try:
+            await query.message.edit_text(
+                f"🔔 **Notun Member Verification Request!**[span_6](start_span)[span_6](end_span)\n\n"
+                f"👤 User ID: `{target_id}`[span_7](start_span)[span_7](end_span)\n"
+                f"📌 Status: ✅ Approved\n\n"
+                f"✅ **Verified by Admin**[span_8](start_span)[span_8](end_span)",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
         try:
             await context.bot.send_message(
                 chat_id=target_id,
-                text="🎉 আপনার চ্যানেল জয়েন রিকোয়েস্ট এডমিন কর্তৃক অ্যাপ্রুভ করা হয়েছে! এখন আপনি বট পুরোপুরি ব্যবহার করতে পারবেন। /start লিখে মেনুতে যান।"
+                text="🎉 অভিনন্দন! আপনার ভেরিফিকেশন এডমিন কর্তৃক **Approved** হয়েছে। এখন বট ব্যবহার করতে /start লিখুন।"
             )
         except Exception as e:
             logger.error(f"Failed to notify user: {e}")
@@ -125,11 +147,21 @@ async def button_handler(update: Update, context):
 
     elif data.startswith("reject_user_"):
         target_id = int(data.split("_")[2])
-        await query.message.edit_text(f"❌ ইউজার (`{target_id}`) এর চ্যানেল জয়েন রিকোয়েস্ট **রিজেক্ট** করা হয়েছে।", parse_mode="Markdown")
+        try:
+            await query.message.edit_text(
+                f"🔔 **Notun Member Verification Request!**[span_9](start_span)[span_9](end_span)\n\n"
+                f"👤 User ID: `{target_id}`[span_10](start_span)[span_10](end_span)\n"
+                f"📌 Status: ❌ Rejected\n\n"
+                f"❌ **Rejected by Admin**",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
         try:
             await context.bot.send_message(
                 chat_id=target_id,
-                text="❌ আপনার চ্যানেল জয়েন রিকোয়েস্টটি এডমিন কর্তৃক রিজেক্ট করা হয়েছে।"
+                text="❌ আপনার ভেরিফিকেশন রিকোয়েস্টটি রিজেক্ট করা হয়েছে কারণ আপনি সম্ভবত গ্রুপে জয়েন করেননি। অনুগ্রহ করে গ্রুপে জয়েন করে আবার /start দিন।"
             )
         except Exception as e:
             logger.error(f"Failed to notify user: {e}")
@@ -145,7 +177,7 @@ async def button_handler(update: Update, context):
         try:
             await context.bot.send_message(
                 chat_id=target_id,
-                text=f"✅ আপনার {amount} BDT ডিপোজিট এডমিন কর্তৃক **অ্যাপ্রুভ** হয়েছে! আপনার বর্তমান ব্যালেন্স: {user_balances[target_id]} BDT。"
+                text=f"✅ আপনার {amount} BDT ডিপোজিট এডমিন কর্তৃক **অ্যাপ্রুভ** হয়েছে! আপনার বর্তমান ব্যালেন্স: {user_balances[target_id]} BDT।"
             )
         except Exception as e:
             logger.error(f"Failed to notify user: {e}")
@@ -234,7 +266,11 @@ async def button_handler(update: Update, context):
 
     user_states.pop(user_id, None)
 
-    if data == "buy_gmail":
+    if data == "balance_info":
+        balance = user_balances.get(user_id, 0.0)
+        await query.answer(f"💰 আপনার বর্তমান ব্যালেন্স: {balance} BDT", show_alert=True)
+
+    elif data == "buy_gmail":
         user_states[user_id] = "waiting_buy_qty"
         text = (
             "🛒 **জিমেইল ক্রয় প্যানেল:**\n\n"
@@ -296,15 +332,6 @@ async def button_handler(update: Update, context):
         keyboard = [[InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]]
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
-    elif data == "balance_menu":
-        balance = user_balances.get(user_id, 0.0)
-        text = f"💰 **আপনার একাউন্ট:**\n\nবর্তমান ব্যালেন্স: {balance} BDT\n\n*(সর্বনিম্ন উইথড্র: ৬০ BDT)*"
-        keyboard = [
-            [InlineKeyboardButton("💸 উইথড্র করুন", callback_data="withdraw_request")],
-            [InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]
-        ]
-        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-
     elif data == "withdraw_request":
         balance = user_balances.get(user_id, 0.0)
         if balance < 60:
@@ -315,10 +342,9 @@ async def button_handler(update: Update, context):
             keyboard = [[InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]]
             await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
-    # Withdraw Gateway Selection (bKash or Nagad)
     elif data.startswith("wd_method_"):
         parts = data.split("_")
-        method = parts[2] # bkash or nagad
+        method = parts[2]
         amount = float(parts[3])
         
         balance = user_balances.get(user_id, 0.0)
@@ -336,7 +362,7 @@ async def button_handler(update: Update, context):
         )
 
     elif data == "main_menu":
-        await query.message.edit_text("প্রধান মেনু:", reply_markup=get_main_menu())
+        await query.message.edit_text("প্রধান মেনু:", reply_markup=get_main_menu(user_id))
 
 # Message Handler for multi-step inputs
 async def handle_message(update: Update, context):
@@ -364,7 +390,7 @@ async def handle_message(update: Update, context):
                 f"✅ সফলভাবে আপনার একাউন্ট থেকে {total_cost} BDT কেটে নেওয়া হয়েছে!\n"
                 f"অবশিষ্ট ব্যালেন্স: {user_balances[user_id]} BDT\n\n"
                 "⏳ অর্ডার স্ট্যাটাস: **পেন্ডিং**\n"
-                "এডমিন খুব শীঘ্রই আপনাকে জিমেইলগুলো দিয়ে দেবেন।"
+                "এডমিন খুব শীঘ্রই আপনাকে জিমেইলগুলো দিয়ে দেবেন。"
             )
 
             try:
@@ -376,14 +402,14 @@ async def handle_message(update: Update, context):
             except Exception as e:
                 logger.error(f"Failed to notify admin: {e}")
 
-            await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu())
+            await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu(user_id))
         else:
             user_states.pop(user_id, None)
             await update.message.reply_text(
                 f"❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!\n"
                 f"আপনার প্রয়োজন {total_cost} BDT, কিন্তু আছে {current_balance} BDT。\n"
                 "অনুগ্রহ করে আগে ডিপোজিট করুন。",
-                reply_markup=get_main_menu()
+                reply_markup=get_main_menu(user_id)
             )
 
     elif state == "waiting_deposit_amount":
@@ -410,7 +436,7 @@ async def handle_message(update: Update, context):
         await update.message.reply_text(
             "⏳ আপনার ডিপোজিট রিকোয়েস্ট জমা হয়েছে!\n"
             "স্ট্যাটাস: **পেন্ডিং**\n"
-            "এডমিন চেক করে আপনার অ্যাকাউন্টে ব্যালেন্স যুক্ত করে দেবেন।"
+            "এডমিন চেক করে আপনার অ্যাকাউন্টে ব্যালেন্স যুক্ত করে দেবেন。"
         )
 
         keyboard = [
@@ -431,7 +457,7 @@ async def handle_message(update: Update, context):
 
         user_states.pop(user_id, None)
         user_temp_data.pop(user_id, None)
-        await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu())
+        await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu(user_id))
 
     elif state == "waiting_withdraw_amount":
         try:
@@ -445,7 +471,7 @@ async def handle_message(update: Update, context):
                 user_states.pop(user_id, None)
                 await update.message.reply_text(
                     f"❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!\nআপনার বর্তমান ব্যালেন্স: {balance} BDT",
-                    reply_markup=get_main_menu()
+                    reply_markup=get_main_menu(user_id)
                 )
                 return
         except ValueError:
@@ -453,7 +479,6 @@ async def handle_message(update: Update, context):
             return
 
         user_states.pop(user_id, None)
-        # Present bKash or Nagad selection buttons side by side
         keyboard = [
             [
                 InlineKeyboardButton("🔴 বিকাশ (bKash)", callback_data=f"wd_method_bkash_{amount}"),
@@ -504,7 +529,7 @@ async def handle_message(update: Update, context):
 
         user_states.pop(user_id, None)
         user_temp_data.pop(user_id, None)
-        await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu())
+        await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu(user_id))
 
     elif state == "waiting_fresh_email":
         user_temp_data[user_id] = {"email": text}
@@ -536,7 +561,7 @@ async def handle_message(update: Update, context):
 
         user_states.pop(user_id, None)
         user_temp_data.pop(user_id, None)
-        await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu())
+        await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu(user_id))
 
 # Background Auto Scheduler for Group Messages
 async def daily_scheduler(application):
@@ -561,7 +586,7 @@ async def daily_scheduler(application):
                 msg = (
                     "🛑 **নোটিশ:**\n\n"
                     "আজকের মতো জিমেইল নেওয়া শেষ! এরপর থেকে আর জিমেইল নেওয়া হবে না। অনুগ্রহ করে আগামীকাল থেকে জিমেইল দিবেন। ধন্যবাদ。\n\n"
-                    "⚠️ একটু পর সবার জিমেইল চেক করা হবে। চেকের পরে যাদের যাদের পেমেন্ট রেডি হয়েছে, তারা পেমেন্টের জন্য বটের মাধ্যমে সাবমিট করুন। ধন্যবাদ。"
+                    "⚠️ একটু পর সবার জিমেইল চেক করা হবে। চেকের পরে যাদের যাদের পেমেন্ট রেডি হয়েছে, তারা পেমেন্টের জন্য বটের মাধ্যমে সাবমিট করুন। ধন্যবাদ।"
                 )
                 await application.bot.send_message(chat_id=GROUP_CHAT_ID, text=msg, parse_mode="Markdown")
             except Exception as e:
@@ -588,9 +613,8 @@ async def main():
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(check_join_callback, pattern="^check_join$"))
+    application.add_handler(CallbackQueryHandler(check_group_join_callback, pattern="^check_group_join$"))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(ChatJoinRequestHandler(handle_chat_join_request))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     await run_web_server()
