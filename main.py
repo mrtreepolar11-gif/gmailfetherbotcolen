@@ -1,7 +1,7 @@
 import logging
 import os
 import asyncio
-from datetime import datetime, time
+from datetime import datetime
 from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatJoinRequest
 from telegram.ext import (
@@ -153,7 +153,8 @@ async def button_handler(update: Update, context):
         return
 
     elif data.startswith("dep_reject_"):
-        target_id = int(parts[2]) if 'parts' in locals() and len(parts) > 2 else int(data.split("_")[2])
+        parts = data.split("_")
+        target_id = int(parts[2])
         await query.message.edit_text("❌ ডিপোজিট রিকোয়েস্ট **রিজেক্ট** করা হয়েছে।")
         try:
             await context.bot.send_message(
@@ -325,7 +326,7 @@ async def handle_message(update: Update, context):
             user_states.pop(user_id, None)
             await update.message.reply_text(
                 f"❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!\n"
-                f"আপনার প্রয়োজন {total_cost} BDT, কিন্তু আছে {current_balance} BDT。\n"
+                f"আপনার প্রয়োজন {total_cost} BDT, কিন্তু আছে {current_balance} BDT।\n"
                 "অনুগ্রহ করে আগে ডিপোজিট করুন。",
                 reply_markup=get_main_menu()
             )
@@ -343,7 +344,7 @@ async def handle_message(update: Update, context):
         user_temp_data[user_id] = {"deposit_amount": amount}
         user_states[user_id] = "waiting_deposit_trx"
         await update.message.reply_text(
-            f"✅ ডিপোজিট অ্যামাউন্ট: {amount} BDT গৃহীত হয়েছে。\n\n"
+            f"✅ ডিপোজিট অ্যামাউন্ট: {amount} BDT গৃহীত হয়েছে।\n\n"
             "🔑 এখন আপনার পেমেন্ট করা **ট্রানজেকশন আইডি (TrxID)** লিখে পাঠান:"
         )
 
@@ -354,7 +355,7 @@ async def handle_message(update: Update, context):
         await update.message.reply_text(
             "⏳ আপনার ডিপোজিট রিকোয়েস্ট জমা হয়েছে!\n"
             "স্ট্যাটাস: **পেন্ডিং**\n"
-            "এডমিন চেক করে আপনার অ্যাকাউন্টে ব্যালেন্স যুক্ত করে দেবেন。"
+            "এডমিন চেক করে আপনার অ্যাকাউন্টে ব্যালেন্স যুক্ত করে দেবেন।"
         )
 
         keyboard = [
@@ -475,7 +476,6 @@ async def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(check_join_callback, pattern="^check_join$"))
     application.add_handler(CallbackQueryHandler(button_handler))
-    # Registering ChatJoinRequestHandler so join requests trigger admin notifications
     application.add_handler(ChatJoinRequestHandler(handle_chat_join_request))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
