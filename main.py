@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 TOKEN = "9197059198:AAF-uRkXSJjGiQF54qsBXKBBfK53H9l5s3Q"
 ADMIN_ID = 7458685213
 ADMIN_USERNAME = "@nahidbro204"
-CHANNEL_LINK = "https://t.me/nahidgmailsallar204"  # অফিশিয়াল গ্রুপ/চ্যানেল লিংক
+CHANNEL_LINK = "https://t.me/nahidgmailsallar204"
 BOT_LINK = "https://t.me/gmailfetherbot"
 
 GROUP_CHAT_ID = -100435225206  # আপনার গ্রুপ আইডি
@@ -62,11 +62,11 @@ async def start(update: Update, context):
     else:
         text = (
             f"🔔 **Notun Member Verification Request!**\n\n"
-            f"আমাদের অফিশিয়াল গ্রুপে জয়েন করুন। এখানে সকল বট চ্যানেলের আপডেট দেওয়া হবে[span_2](start_span)[span_2](end_span)!\n\n"
+            f"আমাদের অফিশিয়াল গ্রুপে জয়েন করুন। এখানে সকল বট চ্যানেলের আপডেট দেওয়া হবে!\n\n"
             f"👉 গ্রুপ লিংক: {CHANNEL_LINK}"
         )
         keyboard = [
-            [InlineKeyboardButton("📢 গ্রুপে জয়েন করুন", url=CHANNEL_LINK)],
+            [InlineKeyboardButton("📢 গ্রুপে জয়en করুন", url=CHANNEL_LINK)],
             [InlineKeyboardButton("✅ আমি গ্রুপে জয়েন করেছি", callback_data="check_group_join")]
         ]
         if update.message:
@@ -85,12 +85,10 @@ async def check_group_join_callback(update: Update, context):
         await query.message.edit_text("✅ আপনার ভেরিফিকেশন ইতিমধ্যে সম্পন্ন হয়েছে! মূল মেনু:", reply_markup=get_main_menu(user_id))
         return
 
-    # Notify user to wait
     await query.message.edit_text(
         "⏳ আপনার রিকোয়েস্ট গ্রহণ করা হয়েছে। দয়া করে কিছুক্ষণ অপেক্ষা করুন, এডমিন চেক করে এপ্রুভ করলেই মেনুবার দেখতে পাবেন।"
     )
 
-    # Send notification to Admin with Approve/Reject buttons
     keyboard = [
         [
             InlineKeyboardButton("✅ Approve", callback_data=f"approve_user_{user_id}"),
@@ -101,10 +99,10 @@ async def check_group_join_callback(update: Update, context):
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=(
-                f"🔔 **Notun Member Verification Request!**[span_3](start_span)[span_3](end_span)\n\n"
-                f"👤 User ID: `{user_id}`[span_4](start_span)[span_4](end_span)\n"
+                f"🔔 **Notun Member Verification Request!**\n\n"
+                f"👤 User ID: `{user_id}`\n"
                 f"👤 Name: {user.full_name}\n"
-                f"🌐 Username: @{user.username if user.username else 'N/A'}[span_5](start_span)[span_5](end_span)\n"
+                f"🌐 Username: @{user.username if user.username else 'N/A'}\n"
                 f"📌 Status: ⏳ Pending"
             ),
             reply_markup=InlineKeyboardMarkup(keyboard),
@@ -120,17 +118,16 @@ async def button_handler(update: Update, context):
     data = query.data
     user_id = query.from_user.id
 
-    # Admin approval for user verification
     if data.startswith("approve_user_"):
         target_id = int(data.split("_")[2])
         approved_users.add(target_id)
         
         try:
             await query.message.edit_text(
-                f"🔔 **Notun Member Verification Request!**[span_6](start_span)[span_6](end_span)\n\n"
-                f"👤 User ID: `{target_id}`[span_7](start_span)[span_7](end_span)\n"
+                f"🔔 **Notun Member Verification Request!**\n\n"
+                f"👤 User ID: `{target_id}`\n"
                 f"📌 Status: ✅ Approved\n\n"
-                f"✅ **Verified by Admin**[span_8](start_span)[span_8](end_span)",
+                f"✅ **Verified by Admin**",
                 parse_mode="Markdown"
             )
         except Exception:
@@ -149,8 +146,8 @@ async def button_handler(update: Update, context):
         target_id = int(data.split("_")[2])
         try:
             await query.message.edit_text(
-                f"🔔 **Notun Member Verification Request!**[span_9](start_span)[span_9](end_span)\n\n"
-                f"👤 User ID: `{target_id}`[span_10](start_span)[span_10](end_span)\n"
+                f"🔔 **Notun Member Verification Request!**\n\n"
+                f"👤 User ID: `{target_id}`\n"
                 f"📌 Status: ❌ Rejected\n\n"
                 f"❌ **Rejected by Admin**",
                 parse_mode="Markdown"
@@ -167,7 +164,6 @@ async def button_handler(update: Update, context):
             logger.error(f"Failed to notify user: {e}")
         return
 
-    # Deposit Approval
     if data.startswith("dep_approve_"):
         parts = data.split("_")
         target_id = int(parts[2])
@@ -177,7 +173,7 @@ async def button_handler(update: Update, context):
         try:
             await context.bot.send_message(
                 chat_id=target_id,
-                text=f"✅ আপনার {amount} BDT ডিপোজিট এডমিন কর্তৃক **অ্যাপ্রুভ** হয়েছে! আপনার বর্তমান ব্যালেন্স: {user_balances[target_id]} BDT।"
+                text=f"✅ আপনার {amount} BDT ডিপোজিট এডমিন কর্তৃক **অ্যাপ্রুভ** হয়েছে! আপনার বর্তমান ব্যালেন্স: {user_balances[target_id]} BDT。"
             )
         except Exception as e:
             logger.error(f"Failed to notify user: {e}")
@@ -196,7 +192,6 @@ async def button_handler(update: Update, context):
             logger.error(f"Failed to notify user: {e}")
         return
 
-    # Withdraw Approval & Rejection by Admin
     if data.startswith("wd_approve_"):
         parts = data.split("_")
         target_id = int(parts[2])
@@ -209,7 +204,7 @@ async def button_handler(update: Update, context):
             try:
                 await context.bot.send_message(
                     chat_id=target_id,
-                    text=f"🎉 আপনার {amount} BDT উইথড্র রিকোয়েস্ট এডমিন কর্তৃক সফলভাবে **অ্যাপ্রুভ** ও পেমেন্ট সম্পন্ন হয়েছে! বর্তমান ব্যালেন্স: {user_balances[target_id]} BDT।"
+                    text=f"🎉 আপনার {amount} BDT উইথড্র রিকোয়েস্ট এডমিন কর্তৃক সফলভাবে **অ্যাপ্রুভ** ও পেমেন্ট সম্পন্ন হয়েছে! বর্তমান ব্যালেন্স: {user_balances[target_id]} BDT。"
                 )
             except Exception as e:
                 logger.error(f"Failed to notify user about withdrawal approval: {e}")
@@ -230,7 +225,6 @@ async def button_handler(update: Update, context):
             logger.error(f"Failed to notify user about withdrawal rejection: {e}")
         return
 
-    # Gmail Rejection Action
     if data.startswith("gmail_reject_"):
         parts = data.split("_")
         target_id = int(parts[2])
@@ -246,7 +240,6 @@ async def button_handler(update: Update, context):
             logger.error(f"Failed to notify user about Gmail rejection: {e}")
         return
 
-    # Gmail Approval Action
     elif data.startswith("gmail_approve_"):
         parts = data.split("_")
         target_id = int(parts[2])
@@ -390,7 +383,7 @@ async def handle_message(update: Update, context):
                 f"✅ সফলভাবে আপনার একাউন্ট থেকে {total_cost} BDT কেটে নেওয়া হয়েছে!\n"
                 f"অবশিষ্ট ব্যালেন্স: {user_balances[user_id]} BDT\n\n"
                 "⏳ অর্ডার স্ট্যাটাস: **পেন্ডিং**\n"
-                "এডমিন খুব শীঘ্রই আপনাকে জিমেইলগুলো দিয়ে দেবেন。"
+                "এডমিন খুব শীঘ্রই আপনাকে জিমেইলগুলো দিয়ে দেবেন।"
             )
 
             try:
@@ -407,8 +400,8 @@ async def handle_message(update: Update, context):
             user_states.pop(user_id, None)
             await update.message.reply_text(
                 f"❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!\n"
-                f"আপনার প্রয়োজন {total_cost} BDT, কিন্তু আছে {current_balance} BDT。\n"
-                "অনুগ্রহ করে আগে ডিপোজিট করুন。",
+                f"আপনার প্রয়োজন {total_cost} BDT, কিন্তু আছে {current_balance} BDT।\n"
+                "অনুগ্রহ করে আগে ডিপোজিট করুন।",
                 reply_markup=get_main_menu(user_id)
             )
 
@@ -436,7 +429,7 @@ async def handle_message(update: Update, context):
         await update.message.reply_text(
             "⏳ আপনার ডিপোজিট রিকোয়েস্ট জমা হয়েছে!\n"
             "স্ট্যাটাস: **পেন্ডিং**\n"
-            "এডমিন চেক করে আপনার অ্যাকাউন্টে ব্যালেন্স যুক্ত করে দেবেন。"
+            "এডমিন চেক করে আপনার অ্যাকাউন্টে ব্যালেন্স যুক্ত করে দেবেন।"
         )
 
         keyboard = [
@@ -595,7 +588,7 @@ async def daily_scheduler(application):
 
         await asyncio.sleep(30)
 
-# Simple Aiohttp Web Server for Render Health Check
+# Aiohttp Web Server with Self-Ping to Keep Render Alive 24/7
 async def handle_web(request):
     return web.Response(text="Bot is running smoothly 24/7!")
 
