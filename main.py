@@ -29,8 +29,8 @@ def get_main_menu():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# /start command
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE if 'ContextTypes' in globals() else object):
+# /start command (Fixed syntax)
+async def start(update: Update, context):
     user = update.effective_user
     if user.id not in user_balances:
         user_balances[user.id] = 0.0
@@ -85,7 +85,7 @@ async def button_handler(update: Update, context):
     elif data == "main_menu":
         await query.message.edit_text("প্রধান মেনু:", reply_markup=get_main_menu())
 
-# Simple Aiohttp Web Server for Render Health Check
+# Simple Aiohttp Web Server for Render Health Check (Keeps bot alive 24/7)
 async def handle_web(request):
     return web.Response(text="Bot is running smoothly 24/7!")
 
@@ -97,4 +97,27 @@ async def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    logger.info(f"Web server started on
+    logger.info(f"Web server started on port {port}")
+
+async def main():
+    # Build Telegram Bot
+    application = Application.builder().token(TOKEN).build()
+    
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_handler))
+
+    # Start Web Server and Bot together
+    await run_web_server()
+    logger.info("Starting Telegram Bot...")
+    
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+
+    # Keep the application running
+    stop_event = asyncio.Event()
+    await stop_event.wait()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main
