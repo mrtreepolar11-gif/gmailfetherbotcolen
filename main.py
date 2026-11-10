@@ -3,7 +3,7 @@ import os
 import asyncio
 from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 
 # Logging setup
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -16,8 +16,6 @@ ADMIN_USERNAME = "@nahidbro204"
 
 # In-memory Database
 user_balances = {}  # user_id -> balance
-pending_withdrawals = {}  # withdrawal_id -> details
-order_counter = 1
 
 # Main Menu Keyboard
 def get_main_menu():
@@ -25,11 +23,11 @@ def get_main_menu():
         [InlineKeyboardButton("📥 জিমেইল কিনুন (Buy)", callback_data="buy_gmail")],
         [InlineKeyboardButton("📤 জিমেইল বিক্রি করুন (Sell)", callback_data="sell_gmail")],
         [InlineKeyboardButton("💰 ব্যালেন্স ও উইথড্র", callback_data="balance_menu")],
-        [InlineKeyboardButton("☎️ এডমিন সাপোর্ট", url=f"https://t.me/nahidbro204")]
+        [InlineKeyboardButton("☎️ এডমিন সাপোর্ট", url="https://t.me/nahidbro204")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# /start command (Fixed syntax)
+# /start command
 async def start(update: Update, context):
     user = update.effective_user
     if user.id not in user_balances:
@@ -55,8 +53,10 @@ async def button_handler(update: Update, context):
 
     if data == "buy_gmail":
         text = "🛒 **জিমেইল ক্রয় প্যানেল:**\n\nপ্রতি জিমেইল এর মূল্য: ২০ BDT\nআপনি কি কিনতে চান?"
-        keyboard = [[InlineKeyboardButton("✅ কনফার্ম কিনুন", callback_data="confirm_buy")],
-                    [InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]]
+        keyboard = [
+            [InlineKeyboardButton("✅ কনফার্ম কিনুন", callback_data="confirm_buy")],
+            [InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]
+        ]
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
     elif data == "sell_gmail":
@@ -78,14 +78,14 @@ async def button_handler(update: Update, context):
         if balance < 60:
             await query.answer("⚠️ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই! সর্বনিম্ন ৬০ BDT হতে হবে।", show_alert=True)
         else:
-            text = f"💸 আপনার বর্তমান ব্যালেন্স {balance} BDT। উইথড্র করার জন্য আপনার পেমেন্ট নম্বর (Bkash/Nagad) ও অ্যামাউন্ট লিখে পাঠান।"
+            text = f"💸 আপনার বর্তমান ব্যালেন্স {balance} BDT। উইথড্র করার জন্য আপনার পেমেন্ট নম্বর ও অ্যামাউন্ট লিখে পাঠান।"
             keyboard = [[InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]]
             await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
     elif data == "main_menu":
         await query.message.edit_text("প্রধান মেনু:", reply_markup=get_main_menu())
 
-# Simple Aiohttp Web Server for Render Health Check (Keeps bot alive 24/7)
+# Simple Aiohttp Web Server for Render Health Check
 async def handle_web(request):
     return web.Response(text="Bot is running smoothly 24/7!")
 
@@ -100,13 +100,11 @@ async def run_web_server():
     logger.info(f"Web server started on port {port}")
 
 async def main():
-    # Build Telegram Bot
     application = Application.builder().token(TOKEN).build()
     
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Start Web Server and Bot together
     await run_web_server()
     logger.info("Starting Telegram Bot...")
     
@@ -114,10 +112,11 @@ async def main():
     await application.start()
     await application.updater.start_polling()
 
-    # Keep the application running
     stop_event = asyncio.Event()
     await stop_event.wait()
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped.")
