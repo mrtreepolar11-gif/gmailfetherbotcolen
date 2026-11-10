@@ -81,7 +81,7 @@ async def check_join_callback(update: Update, context):
     else:
         await query.answer("⚠️ এডমিন এখনো আপনার জয়েন রিকোয়েস্ট অ্যাপ্রুভ করেননি অথবা আপনি রিকোয়েস্ট পাঠাননি। দয়া করে রিকোয়েস্ট পাঠিয়ে অপেক্ষা করুন।", show_alert=True)
 
-# Auto handle channel join requests and notify admin with Approve/Reject buttons
+# Auto handle channel/group join requests and notify admin with Approve/Reject buttons
 async def handle_chat_join_request(update: ChatJoinRequest, context):
     user = update.from_user
     user_id = user.id
@@ -108,7 +108,6 @@ async def button_handler(update: Update, context):
     await query.answer()
     data = query.data
     user_id = query.from_user.id
-    user_states.pop(user_id, None)
 
     # Admin approval for channel join request
     if data.startswith("approve_user_"):
@@ -165,6 +164,40 @@ async def button_handler(update: Update, context):
             logger.error(f"Failed to notify user: {e}")
         return
 
+    # Withdraw Approval & Rejection by Admin
+    if data.startswith("wd_approve_"):
+        parts = data.split("_")
+        target_id = int(parts[2])
+        amount = float(parts[3])
+        
+        current_bal = user_balances.get(target_id, 0.0)
+        if current_bal >= amount:
+            user_balances[target_id] = current_bal - amount
+            await query.message.edit_text(f"✅ উইথড্র সফলভাবে **অ্যাপ্রুভ** করা হয়েছে। ইউজারকে পেমেন্ট প্রদান করা হয়েছে।")
+            try:
+                await context.bot.send_message(
+                    chat_id=target_id,
+                    text=f"🎉 আপনার {amount} BDT উইথড্র রিকোয়েস্ট এডমিন কর্তৃক সফলভাবে **অ্যাপ্রুভ** ও পেমেন্ট সম্পন্ন হয়েছে! বর্তমান ব্যালেন্স: {user_balances[target_id]} BDT।"
+                )
+            except Exception as e:
+                logger.error(f"Failed to notify user about withdrawal approval: {e}")
+        else:
+            await query.message.edit_text("⚠️ ইউজারের অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই তাই উইথড্র প্রসেস করা যায়নি।")
+        return
+
+    elif data.startswith("wd_reject_"):
+        parts = data.split("_")
+        target_id = int(parts[2])
+        await query.message.edit_text("❌ উইথড্র রিকোয়েস্ট **রিজেক্ট** করা হয়েছে।")
+        try:
+            await context.bot.send_message(
+                chat_id=target_id,
+                text="❌ আপনার উইথড্র রিকোয়েস্টটি এডমিন কর্তৃক রিজেক্ট করা হয়েছে।"
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify user about withdrawal rejection: {e}")
+        return
+
     # Gmail Rejection Action
     if data.startswith("gmail_reject_"):
         parts = data.split("_")
@@ -198,6 +231,8 @@ async def button_handler(update: Update, context):
         except Exception as e:
             logger.error(f"Failed to notify user about Gmail approval: {e}")
         return
+
+    user_states.pop(user_id, None)
 
     if data == "buy_gmail":
         user_states[user_id] = "waiting_buy_qty"
@@ -275,10 +310,30 @@ async def button_handler(update: Update, context):
         if balance < 60:
             await query.answer("⚠️ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই! সর্বনিম্ন উইথড্র ৬০ BDT হতে হবে।", show_alert=True)
         else:
-            user_states[user_id] = "waiting_withdraw"
-            text = f"💸 আপনার বর্তমান ব্যালেন্স {balance} BDT। উইথড্র করার জন্য আপনার পেমেন্ট নম্বর ও অ্যামাউন্ট লিখে পাঠান:"
+            user_states[user_id] = "waiting_withdraw_amount"
+            text = f"💸 আপনার বর্তমান ব্যালেন্স: {balance} BDT\n\nআপনি কত টাকা উইথড্র করতে চান? অ্যামাউন্ট লিখে পাঠান (যেমন: `100`):"
             keyboard = [[InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]]
             await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+    # Withdraw Gateway Selection (bKash or Nagad)
+    elif data.startswith("wd_method_"):
+        parts = data.split("_")
+        method = parts[2] # bkash or nagad
+        amount = float(parts[3])
+        
+        balance = user_balances.get(user_id, 0.0)
+        if balance < amount:
+            await query.message.edit_text("❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]]))
+            return
+
+        user_temp_data[user_id] = {"withdraw_method": method, "withdraw_amount": amount}
+        user_states[user_id] = "waiting_withdraw_number"
+        
+        await query.message.edit_text(
+            f"✅ মাধ্যম নির্বাচিত হয়েছে: **{method.upper()}**\n"
+            f"💵 অ্যামাউন্ট: **{amount} BDT**\n\n"
+            "📱 এখন আপনার সঠিক পেমেন্ট নম্বরটি (Personal Number) লিখে পাঠান:"
+        )
 
     elif data == "main_menu":
         await query.message.edit_text("প্রধান মেনু:", reply_markup=get_main_menu())
@@ -326,7 +381,7 @@ async def handle_message(update: Update, context):
             user_states.pop(user_id, None)
             await update.message.reply_text(
                 f"❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!\n"
-                f"আপনার প্রয়োজন {total_cost} BDT, কিন্তু আছে {current_balance} BDT।\n"
+                f"আপনার প্রয়োজন {total_cost} BDT, কিন্তু আছে {current_balance} BDT。\n"
                 "অনুগ্রহ করে আগে ডিপোজিট করুন。",
                 reply_markup=get_main_menu()
             )
@@ -378,6 +433,79 @@ async def handle_message(update: Update, context):
         user_temp_data.pop(user_id, None)
         await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu())
 
+    elif state == "waiting_withdraw_amount":
+        try:
+            amount = float(text)
+            if amount < 60:
+                await update.message.reply_text("⚠️ সর্বনিম্ন উইথড্র ৬০ BDT হতে হবে। সঠিক পরিমাণ লিখে পাঠান:")
+                return
+            
+            balance = user_balances.get(user_id, 0.0)
+            if balance < amount:
+                user_states.pop(user_id, None)
+                await update.message.reply_text(
+                    f"❌ আপনার একাউন্টে পর্যাপ্ত ব্যালেন্স নেই!\nআপনার বর্তমান ব্যালেন্স: {balance} BDT",
+                    reply_markup=get_main_menu()
+                )
+                return
+        except ValueError:
+            await update.message.reply_text("⚠️ দয়া করে সঠিক সংখ্যা লিখুন (যেমন: 100):")
+            return
+
+        user_states.pop(user_id, None)
+        # Present bKash or Nagad selection buttons side by side
+        keyboard = [
+            [
+                InlineKeyboardButton("🔴 বিকাশ (bKash)", callback_data=f"wd_method_bkash_{amount}"),
+                InlineKeyboardButton("🟠 নগদ (Nagad)", callback_data=f"wd_method_nagad_{amount}")
+            ],
+            [InlineKeyboardButton("« মূল মেনু", callback_data="main_menu")]
+        ]
+        await update.message.reply_text(
+            f"✅ উইথড্র অ্যামাউন্ট: **{amount} BDT**\n\nপেমেন্ট নেওয়ার জন্য আপনার মাধ্যম সিলেক্ট করুন:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+
+    elif state == "waiting_withdraw_number":
+        number = text
+        data_dict = user_temp_data.get(user_id, {})
+        method = data_dict.get("withdraw_method", "N/A")
+        amount = data_dict.get("withdraw_amount", 0)
+
+        await update.message.reply_text(
+            "⏳ আপনার উইথড্র রিকোয়েস্ট সফলভাবে জমা হয়েছে!\n"
+            "স্ট্যাটাস: **পেন্ডিং**\n"
+            "এডমিন পেমেন্ট কমপ্লিট করে আপনার একাউন্ট থেকে ব্যালেন্স কেটে নেবেন।"
+        )
+
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Approve Withdraw", callback_data=f"wd_approve_{user_id}_{amount}"),
+                InlineKeyboardButton("❌ Reject Withdraw", callback_data=f"wd_reject_{user_id}")
+            ]
+        ]
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_ID,
+                text=(
+                    f"💸 **নতুন উইথড্র রিকোয়েস্ট!**\n\n"
+                    f"👤 ইউজার আইডি: `{user_id}`\n"
+                    f"💳 মাধ্যম: **{method.upper()}**\n"
+                    f"📱 নম্বর: `{number}`\n"
+                    f"💵 অ্যামাউন্ট: {amount} BDT\n"
+                    f"📌 স্ট্যাটাস: পেন্ডিং"
+                ),
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify admin about withdrawal: {e}")
+
+        user_states.pop(user_id, None)
+        user_temp_data.pop(user_id, None)
+        await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu())
+
     elif state == "waiting_fresh_email":
         user_temp_data[user_id] = {"email": text}
         user_states[user_id] = "waiting_fresh_password"
@@ -410,20 +538,6 @@ async def handle_message(update: Update, context):
         user_temp_data.pop(user_id, None)
         await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu())
 
-    elif state == "waiting_withdraw":
-        await update.message.reply_text("✅ আপনার উইথড্র রিকোয়েস্ট সফলভাবে জমা হয়েছে! এডমিন পেমেন্ট কমপ্লিট করে দেবেন।")
-        try:
-            await context.bot.send_message(
-                chat_id=ADMIN_ID,
-                text=f"💸 **নতুন উইথড্র রিকোয়েস্ট!**\n\n👤 ইউজার আইডি: `{user_id}`\n💬 বিবরণ: {text}",
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"Failed to notify admin: {e}")
-
-        user_states.pop(user_id, None)
-        await update.message.reply_text("প্রধান মেনু:", reply_markup=get_main_menu())
-
 # Background Auto Scheduler for Group Messages
 async def daily_scheduler(application):
     while True:
@@ -447,7 +561,7 @@ async def daily_scheduler(application):
                 msg = (
                     "🛑 **নোটিশ:**\n\n"
                     "আজকের মতো জিমেইল নেওয়া শেষ! এরপর থেকে আর জিমেইল নেওয়া হবে না। অনুগ্রহ করে আগামীকাল থেকে জিমেইল দিবেন। ধন্যবাদ。\n\n"
-                    "⚠️ একটু পর সবার জিমেইল চেক করা হবে। চেকের পরে যাদের যাদের পেমেন্ট রেডি হয়েছে, তারা পেমেন্টের জন্য বটের মাধ্যমে সাবমিট করুন। ধন্যবাদ।"
+                    "⚠️ একটু পর সবার জিমেইল চেক করা হবে। চেকের পরে যাদের যাদের পেমেন্ট রেডি হয়েছে, তারা পেমেন্টের জন্য বটের মাধ্যমে সাবমিট করুন। ধন্যবাদ。"
                 )
                 await application.bot.send_message(chat_id=GROUP_CHAT_ID, text=msg, parse_mode="Markdown")
             except Exception as e:
