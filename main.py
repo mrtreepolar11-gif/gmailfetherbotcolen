@@ -16,8 +16,8 @@ from telegram.ext import (
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Credentials & Config
-TOKEN = "9197059198:AAF-uRkXSJjGiQF54qsBXKBBfK53H9l5s3Q"
+# Credentials & Config (Updated Bot Token)
+TOKEN = "9197059198:AAGZRPiBUUzo8SVjZ9A9l9jr2EkkD8uydAk"
 ADMIN_ID = 7458685213
 ADMIN_USERNAME = "@nahidbro204"
 CHANNEL_LINK = "https://t.me/nahidgmailsallar204"
@@ -383,7 +383,7 @@ async def handle_message(update: Update, context):
                 f"✅ সফলভাবে আপনার একাউন্ট থেকে {total_cost} BDT কেটে নেওয়া হয়েছে!\n"
                 f"অবশিষ্ট ব্যালেন্স: {user_balances[user_id]} BDT\n\n"
                 "⏳ অর্ডার স্ট্যাটাস: **পেন্ডিং**\n"
-                "এডমিন খুব শীঘ্রই আপনাকে জিমেইলগুলো দিয়ে দেবেন।"
+                "এডমিন খুব শীঘ্রই আপনাকে জিমেইলগুলো দিয়ে দেবেন。"
             )
 
             try:
